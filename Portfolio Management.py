@@ -7,6 +7,11 @@ import yfinance as yf
 
 st.set_page_config(page_title="Dynamic Portfolio Risk Engine", layout="wide")
 
+st.set_page_config(
+    page_title="Portfolio Risk Tool",
+    layout="wide"  # 關鍵：強制開啟寬版模式
+)
+
 st.title("🏛️ Live Technical Portfolio Risk & Stress-Testing Tool")
 st.markdown("Please Don't Adjust the Preset non-stock and non-ETF items")
 
