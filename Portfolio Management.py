@@ -7,8 +7,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Dynamic Portfolio Risk Engine", layout="wide")
 
-st.title("🏛️ Live Technical Portfolio Risk & Stress-Testing Engine")
-st.markdown("輸入任何全球標的代號。針對自訂資產（如存於 HSBC One 的基金或現金），請在 Remark 選擇對應標籤以啟用精算代理參數。")
+st.title("🏛️ Live Technical Portfolio Risk & Stress-Testing Tool")
+st.markdown("Please Don't Adjust the Preset non-stock and non-ETF items")
 
 # --------------------------------------------------------
 # 1. 歷史危機時間窗口定義
@@ -30,7 +30,12 @@ return_model = st.sidebar.radio(
     ["Capital Asset Pricing Model (CAPM)", "Historical Geometric Mean (5Y)"]
 )
 
-rf = 4.0  # 當前無風險利率基準 (%)
+if "rf_rate" not in st.session_state: # 當前無風險利率基準 (%)
+    try:
+        ten_year_bond = yf.Ticker("^TNX")
+        st.session_state.rf_rate = ten_year_bond.history(period="1d")['Close'].iloc[-1]
+    except:
+        st.session_state.rf_rate = 4.0
 market_premium = 5.5  # 市場風險溢酬 (%)
 
 # 更新預設資料，清晰拆分 Cash 與 MMF，並加入 WS2 與預留的 WS3
@@ -106,7 +111,7 @@ def fetch_portfolio_analytics(ticker_rows, rf_rate):
         elif remark == "Money Market Fund (MMF)":
             analytics[tk] = {"beta": 0.01, "geo_return": rf_rate} # MMF 賺取無風險收益，基本無大盤系統風險
         elif remark == "HSBC World Selection 2":
-            analytics[tk] = {"beta": 0.35, "geo_return": 5.20} # 偏保守平衡型代理 (約30%股/70%債)
+            analytics[tk] = {"beta": 0.35, "geo_return": 5.50} # 偏保守平衡型代理 (約30%股/70%債)
         elif remark == "HSBC World Selection 3":
             analytics[tk] = {"beta": 0.55, "geo_return": 6.80} # 平衡增長型代理 (約50%股/50%債)
         
@@ -203,7 +208,7 @@ portfolio_beta = ((edited_df["Weight (%)"] / 100) * edited_df["Beta"]).sum()
 # --------------------------------------------------------
 # 4. INTERACTIVE SCENARIO SELECTOR (移出 Sidebar，移到主頁面最上方以徹底修復滾動 Bug)
 # --------------------------------------------------------
-st.subheader("🎯 Macro Regime Sensitivity Controls")
+st.subheader("🎯 Macro Economic Scenario Selection")
 scenario_list = ["Current Baseline Projections"] + list(CRISIS_PERIODS.keys())
 
 # 在主頁面頂部平鋪展開，下拉選單現在有無限的向下延伸空間，絕對好滑！
@@ -249,7 +254,7 @@ with main_col1:
     st.dataframe(fmt_df[["Ticker/Asset", "Asset Type (Remark)", "Current Value", "Weight (%)", "Beta", "Expected Return (%)", "Scenario Return (%)"]], use_container_width=True)
 
 with main_col2:
-    st.subheader("🍩 Asset Class Remark Distribution")
+    st.subheader("🍩 Asset Distribution")
     fig = px.pie(edited_df, values="Current Value", names="Asset Type (Remark)", hole=0.4, color_discrete_sequence=px.colors.qualitative.Bold)
     fig.update_traces(textposition='inside', textinfo='percent+label')
     fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
@@ -280,3 +285,5 @@ fig_bar = px.bar(
 fig_bar.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
 fig_bar.update_layout(xaxis_ticksuffix="%", coloraxis_showscale=False, yaxis={'categoryorder':'total descending'}, height=350)
 st.plotly_chart(fig_bar, use_container_width=True)
+
+# python -m streamlit run "C:\Users\Ivan\Documents\Ivan (Daily Life)\investment Analysis and Modeling\Portfolio Management.py"
