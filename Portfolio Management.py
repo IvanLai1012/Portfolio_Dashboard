@@ -40,9 +40,24 @@ market_premium = 5.5  # 市場風險溢酬 (%)
 
 # 更新預設資料，清晰拆分 Cash 與 MMF，並加入 WS2 與預留的 WS3
 default_assets = pd.DataFrame({
-    "Ticker/Asset": ["IVV", "QQQ", "NVDA", "IAU", "HSBC_WS2", "MY_MMF", "HKD_CASH"],
-    "Asset Type (Remark)": ["Equity (Core)", "Equity (Satellite)", "Equity (Satellite)", "Alternative (Gold)", "HSBC World Selection 2", "Money Market Fund (MMF)", "Pure Cash"],
-    "Current Value": [150000.0, 20000.0, 30000.0, 20000.0, 100000.0, 30000.0, 20000.0]
+    "Ticker/Asset": ["QQQ", "SCHD", "GOOGL", 
+                     "SAP", "KO", "MCD", 
+                     "MSFT", "VEEV", "NVDA", "IAU",
+                     "WS2", "MMF", "HKD_CASH"],
+    "Asset Type (Remark)": ["Equity (Core)", 
+                            "Equity (Core)", 
+                            "Equity (Satellite)", 
+                            "Equity (Satellite)",
+                            "Equity (Core)",
+                            "Equity (Core)",
+                            "Equity (Satellite)",
+                            "Equity (Satellite)",
+                            "Equity (Satellite)",
+                            "Alternative (Gold)", 
+                            "HSBC World Selection 2", 
+                            "Money Market Fund (MMF)", 
+                            "Pure Cash"],
+    "Current Value": [15, 15, 5, 5, 5, 5, 5, 3, 7, 10, 5, 10, 10]
 })
 
 st.sidebar.subheader("1. Input Live Assets & Remarks")
