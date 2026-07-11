@@ -1,2 +1,2 @@
 # Portfolio_Dashboard
-Provide analysis on portfolio distribution, return rate estimation, sensitivity testing
+Provide investment analysis on portfolio distribution, return rate estimation, sensitivity testing
