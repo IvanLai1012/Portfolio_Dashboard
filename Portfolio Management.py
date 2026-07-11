@@ -312,7 +312,7 @@ with main_col1:
     )
 
 with main_col2:
-    st.subheader("🍕 Asset Allocation (Ticker)")
+    st.subheader("🍕 Asset Allocation")
     fig_ticker = px.pie(
         edited_df,
         values="Current Value",
@@ -320,7 +320,7 @@ with main_col2:
         hole=0.4,
         color_discrete_sequence=px.colors.qualitative.Pastel,
     )
-    fig_ticker.update_traces(textposition="outside", textinfo="percent+label")
+    fig_ticker.update_traces(textposition="inside", textinfo="percent+label")
     fig_ticker.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(fig_ticker, use_container_width=True)
 
