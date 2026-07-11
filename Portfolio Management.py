@@ -5,11 +5,10 @@ import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
-st.set_page_config(page_title="Dynamic Portfolio Risk Engine", layout="wide")
-
+# 1. Page Configuration (Consolidated to a single call)
 st.set_page_config(
     page_title="Portfolio Risk Tool",
-    layout="wide"  # 關鍵：強制開啟寬版模式
+    layout="wide"  # Enforce wide mode for spacious viewports
 )
 
 st.title("🏛️ Live Technical Portfolio Risk & Stress-Testing Tool")
@@ -30,7 +29,6 @@ CRISIS_PERIODS = {
 # --------------------------------------------------------
 st.sidebar.header("🛠️ Portfolio Asset Setup")
 
-# 升級：新增具備精算與量化說服力的衰減型 Alpha 模型選項
 return_model = st.sidebar.radio(
     "Select Expected Return Methodology",
     [
@@ -40,7 +38,6 @@ return_model = st.sidebar.radio(
     ],
 )
 
-# 如果選擇 Smart Estimate，允許用戶自定義 Alpha 衰減因子
 alpha_lambda = 0.3
 if "Smart Realistic Estimate" in return_model:
     alpha_lambda = st.sidebar.slider(
@@ -52,7 +49,7 @@ if "Smart Realistic Estimate" in return_model:
         help="0.3 代表保留 30% 的歷史超額報酬 (Alpha)，將 70% 進行均值回歸。數值越低越理性保守。",
     )
 
-if "rf_rate" not in st.session_state:  # 當前無風險利率基準 (%)
+if "rf_rate" not in st.session_state: 
     try:
         ten_year_bond = yf.Ticker("^TNX")
         st.session_state.rf_rate = (
@@ -60,55 +57,22 @@ if "rf_rate" not in st.session_state:  # 當前無風險利率基準 (%)
         )
     except:
         st.session_state.rf_rate = 4.0
-market_premium = 5.5  # 市場風險溢酬 (%)
+market_premium = 5.5 
 
-# 更新預設資料
 default_assets = pd.DataFrame(
     {
         "Ticker/Asset": [
-            "QQQ",
-            "SCHD",
-            "GOOGL",
-            "SAP",
-            "KO",
-            "MCD",
-            "MSFT",
-            "VEEV",
-            "NVDA",
-            "IAU",
-            "WS2",
-            "MMF",
-            "HKD_CASH",
+            "QQQ", "SCHD", "GOOGL", "SAP", "KO", "MCD", "MSFT", 
+            "VEEV", "NVDA", "IAU", "WS2", "MMF", "HKD_CASH",
         ],
         "Asset Type (Remark)": [
-            "Equity (Core)",
-            "Equity (Core)",
-            "Equity (Satellite)",
-            "Equity (Satellite)",
-            "Equity (Core)",
-            "Equity (Core)",
-            "Equity (Satellite)",
-            "Equity (Satellite)",
-            "Equity (Satellite)",
-            "Alternative (Gold)",
-            "HSBC World Selection 2",
-            "Money Market Fund (MMF)",
-            "Pure Cash",
+            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)", 
+            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)", 
+            "Equity (Satellite)", "Alternative (Gold)", "HSBC World Selection 2", 
+            "Money Market Fund (MMF)", "Pure Cash",
         ],
         "Current Value": [
-            15.0,
-            15.0,
-            5.0,
-            5.0,
-            5.0,
-            5.0,
-            5.0,
-            3.0,
-            7.0,
-            10.0,
-            5.0,
-            10.0,
-            10.0,
+            15.0, 15.0, 5.0, 5.0, 5.0, 5.0, 5.0, 3.0, 7.0, 10.0, 5.0, 10.0, 10.0,
         ],
     }
 )
@@ -135,7 +99,6 @@ edited_df = st.sidebar.data_editor(
     },
 )
 
-# 清理輸入數據
 edited_df = edited_df.dropna(subset=["Ticker/Asset"])
 edited_df["Ticker/Asset"] = edited_df["Ticker/Asset"].str.strip().str.upper()
 
@@ -147,7 +110,7 @@ total_val = edited_df["Current Value"].sum()
 edited_df["Weight (%)"] = (edited_df["Current Value"] / total_val) * 100
 
 # --------------------------------------------------------
-# 3. 核心數據運算引擎 (精密計算或代入代理參數)
+# 3. 核心數據運算引擎
 # --------------------------------------------------------
 @st.cache_data(ttl=3600)
 def fetch_portfolio_analytics(ticker_rows, rf_rate):
@@ -164,25 +127,17 @@ def fetch_portfolio_analytics(ticker_rows, rf_rate):
     ]
     unique_tickers = list(set(api_tickers + ["^GSPC"]))
 
-    start_date = (datetime.now() - pd.Timedelta(days=5 * 365)).strftime(
-        "%Y-%m-%d"
-    )
+    start_date = (datetime.now() - pd.Timedelta(days=5 * 365)).strftime("%Y-%m-%d")
     raw_data = pd.DataFrame()
 
     if api_tickers:
         try:
-            raw_data = yf.download(
-                unique_tickers, start=start_date, interval="1wk"
-            )["Close"]
+            raw_data = yf.download(unique_tickers, start=start_date, interval="1wk")["Close"]
         except Exception as e:
             st.error(f"Error fetching data from Yahoo Finance: {e}")
 
     analytics = {}
-    benchmark_returns = (
-        raw_data["^GSPC"].pct_change().dropna()
-        if "^GSPC" in raw_data
-        else pd.Series()
-    )
+    benchmark_returns = raw_data["^GSPC"].pct_change().dropna() if "^GSPC" in raw_data else pd.Series()
 
     for row in ticker_rows:
         tk = row["Ticker/Asset"]
@@ -203,34 +158,24 @@ def fetch_portfolio_analytics(ticker_rows, rf_rate):
             combined.columns = ["asset", "market"]
 
             if len(combined) > 10 and combined["market"].var() != 0:
-                beta = (
-                    combined["asset"].cov(combined["market"])
-                    / combined["market"].var()
-                )
+                beta = combined["asset"].cov(combined["market"]) / combined["market"].var()
             else:
                 beta = 1.0
 
             total_ret = asset_prices.iloc[-1] / asset_prices.iloc[0]
             n_years = len(asset_prices) / 52.14
-            geo_return = (
-                (total_ret ** (1 / n_years) - 1) * 100
-                if n_years > 0
-                else rf_rate
-            )
+            geo_return = ((total_ret ** (1 / n_years) - 1) * 100 if n_years > 0 else rf_rate)
             analytics[tk] = {"beta": float(beta), "geo_return": float(geo_return)}
         else:
             analytics[tk] = {"beta": 1.0, "geo_return": 8.0}
 
-    # --- 歷史危機壓力測試 ---
     stress_results = {}
     for scenario_name, (s_start, s_end) in CRISIS_PERIODS.items():
         stress_results[scenario_name] = {}
         scen_data = pd.DataFrame()
         if api_tickers:
             try:
-                scen_data = yf.download(unique_tickers, start=s_start, end=s_end)[
-                    "Close"
-                ]
+                scen_data = yf.download(unique_tickers, start=s_start, end=s_end)["Close"]
             except Exception:
                 pass
 
@@ -241,59 +186,31 @@ def fetch_portfolio_analytics(ticker_rows, rf_rate):
             if remark == "Pure Cash":
                 stress_results[scenario_name][tk] = 0.00
             elif remark == "Money Market Fund (MMF)":
-                stress_results[scenario_name][tk] = (
-                    1.20 if "2008" not in scenario_name else 0.50
-                )
+                stress_results[scenario_name][tk] = (1.20 if "2008" not in scenario_name else 0.50)
             elif remark in ["HSBC World Selection 2", "HSBC World Selection 3"]:
                 beta_proxy = 0.35 if remark == "HSBC World Selection 2" else 0.55
                 if "^GSPC" in scen_data and not scen_data["^GSPC"].dropna().empty:
-                    mkt_d = (
-                        (
-                            scen_data["^GSPC"].dropna().iloc[-1]
-                            / scen_data["^GSPC"].dropna().iloc[0]
-                        )
-                        - 1
-                    ) * 100
+                    mkt_d = ((scen_data["^GSPC"].dropna().iloc[-1] / scen_data["^GSPC"].dropna().iloc[0]) - 1) * 100
                     stress_results[scenario_name][tk] = mkt_d * beta_proxy
                 else:
-                    stress_results[scenario_name][tk] = (
-                        -8.0 if remark == "HSBC World Selection 2" else -13.0
-                    )
+                    stress_results[scenario_name][tk] = (-8.0 if remark == "HSBC World Selection 2" else -13.0)
             else:
                 if tk in scen_data and len(scen_data[tk].dropna()) > 2:
                     clean_s = scen_data[tk].dropna()
-                    stress_results[scenario_name][tk] = (
-                        (clean_s.iloc[-1] / clean_s.iloc[0]) - 1
-                    ) * 100
+                    stress_results[scenario_name][tk] = ((clean_s.iloc[-1] / clean_s.iloc[0]) - 1) * 100
                 else:
-                    if (
-                        "^GSPC" in scen_data
-                        and not scen_data["^GSPC"].dropna().empty
-                    ):
-                        mkt_drawdown = (
-                            (
-                                scen_data["^GSPC"].dropna().iloc[-1]
-                                / scen_data["^GSPC"].dropna().iloc[0]
-                            )
-                            - 1
-                        ) * 100
+                    if "^GSPC" in scen_data and not scen_data["^GSPC"].dropna().empty:
+                        mkt_drawdown = ((scen_data["^GSPC"].dropna().iloc[-1] / scen_data["^GSPC"].dropna().iloc[0]) - 1) * 100
                     else:
                         mkt_drawdown = -25.0
-                    stress_results[scenario_name][tk] = (
-                        mkt_drawdown * analytics[tk]["beta"]
-                    )
+                    stress_results[scenario_name][tk] = mkt_drawdown * analytics[tk]["beta"]
 
     return analytics, stress_results
 
 
-# 執行運算
-ticker_input_tuples = edited_df[["Ticker/Asset", "Asset Type (Remark)"]].to_dict(
-    orient="records"
-)
+ticker_input_tuples = edited_df[["Ticker/Asset", "Asset Type (Remark)"]].to_dict(orient="records")
 with st.spinner("Calculating live analytics & mapping accounting remarks..."):
-    live_analytics, stress_matrix = fetch_portfolio_analytics(
-        ticker_input_tuples, st.session_state.rf_rate
-    )
+    live_analytics, stress_matrix = fetch_portfolio_analytics(ticker_input_tuples, st.session_state.rf_rate)
 
 # --------------------------------------------------------
 # 4. 反寫資料庫與三軌制 Methodology 運算
@@ -306,23 +223,18 @@ for idx, row in edited_df.iterrows():
     ana = live_analytics.get(tk, {"beta": 1.0, "geo_return": 8.0})
     live_betas.append(ana["beta"])
 
-    # 1. 理論 CAPM 報酬率計算 (百分比制)
     if row["Asset Type (Remark)"] == "Pure Cash":
         capm_ret = 0.00
     else:
         capm_ret = st.session_state.rf_rate + ana["beta"] * market_premium
 
-    # 2. 歷史幾何平均報酬率
     geo_ret = ana["geo_return"]
 
-    # 3. 三軌制條件分流
     if return_model == "Capital Asset Pricing Model (CAPM)":
         expected_ret = capm_ret
     elif return_model == "Historical Geometric Mean (5Y)":
         expected_ret = geo_ret
     else:
-        # Smart Realistic Estimate 核心公式
-        # 如果是純現金或 MMF，直接維持原定收益，不進行 Alpha 衰減
         if row["Asset Type (Remark)"] in ["Pure Cash", "Money Market Fund (MMF)"]:
             expected_ret = geo_ret
         else:
@@ -333,9 +245,7 @@ for idx, row in edited_df.iterrows():
 
 edited_df["Beta"] = live_betas
 edited_df["Expected Return (%)"] = calculated_returns
-edited_df["Weighted Return (%)"] = (
-    edited_df["Weight (%)"] / 100
-) * edited_df["Expected Return (%)"]
+edited_df["Weighted Return (%)"] = (edited_df["Weight (%)"] / 100) * edited_df["Expected Return (%)"]
 
 portfolio_return_baseline = edited_df["Weighted Return (%)"].sum()
 portfolio_beta = ((edited_df["Weight (%)"] / 100) * edited_df["Beta"]).sum()
@@ -351,14 +261,9 @@ if selected_scen == "Current Baseline Projections":
     portfolio_scen_return = portfolio_return_baseline
     edited_df["Scenario Return (%)"] = edited_df["Expected Return (%)"]
 else:
-    scen_returns = [
-        stress_matrix[selected_scen].get(row["Ticker/Asset"], -10.0)
-        for idx, row in edited_df.iterrows()
-    ]
+    scen_returns = [stress_matrix[selected_scen].get(row["Ticker/Asset"], -10.0) for idx, row in edited_df.iterrows()]
     edited_df["Scenario Return (%)"] = scen_returns
-    portfolio_scen_return = (
-        (edited_df["Weight (%)"] / 100) * edited_df["Scenario Return (%)"]
-    ).sum()
+    portfolio_scen_return = ((edited_df["Weight (%)"] / 100) * edited_df["Scenario Return (%)"]).sum()
 
 # --------------------------------------------------------
 # 6. DASHBOARD CARDS DISPLAY
@@ -370,26 +275,18 @@ c2.metric("Portfolio Volatility (Beta)", f"{portfolio_beta:.2f}")
 c3.metric("Baseline Expected Return", f"{portfolio_return_baseline:.2f}%")
 
 if selected_scen == "Current Baseline Projections":
-    c4.metric(
-        "Scenario Projected Impact",
-        f"{portfolio_scen_return:.2f}%",
-        "No Active Stress",
-    )
+    c4.metric("Scenario Projected Impact", f"{portfolio_scen_return:.2f}%", "No Active Stress")
 else:
     delta_perf = portfolio_scen_return - portfolio_return_baseline
-    c4.metric(
-        "Scenario Return",
-        f"{portfolio_scen_return:.2f}%",
-        f"{delta_perf:.2f}% Stress Shift",
-        delta_color="inverse",
-    )
+    c4.metric("Scenario Return", f"{portfolio_scen_return:.2f}%", f"{delta_perf:.2f}% Stress Shift", delta_color="inverse")
 
 st.markdown("---")
 
 # --------------------------------------------------------
-# 7. VISUALIZATION: DUAL PIE CHARTS & DATA TABLE
+# 7. VISUALIZATION: DATA TABLE & TICKER PIE CHART ONLY
 # --------------------------------------------------------
-main_col1, main_col2, main_col3 = st.columns([4, 3, 3])
+# Left-hand table expanded, Right-hand holds only the clean Ticker Pie
+main_col1, main_col2 = st.columns([5, 5])
 
 with main_col1:
     st.subheader("📋 Dynamically Modeled Asset Allocation")
@@ -397,43 +294,24 @@ with main_col1:
     fmt_df["Current Value"] = fmt_df["Current Value"].map("${:,.2f}".format)
     fmt_df["Weight (%)"] = fmt_df["Weight (%)"].map("{:.2f}%".format)
     fmt_df["Beta"] = fmt_df["Beta"].map("{:.2f}".format)
-    fmt_df["Expected Return (%)"] = fmt_df["Expected Return (%)"].map(
-        "{:.2f}%".format
-    )
-    fmt_df["Scenario Return (%)"] = fmt_df["Scenario Return (%)"].map(
-        "{:.2f}%".format
-    )
+    fmt_df["Expected Return (%)"] = fmt_df["Expected Return (%)"].map("{:.2f}%".format)
+    fmt_df["Scenario Return (%)"] = fmt_df["Scenario Return (%)"].map("{:.2f}%".format)
 
     st.dataframe(
-        fmt_df[
-            [
-                "Ticker/Asset",
-                "Asset Type (Remark)",
-                "Current Value",
-                "Weight (%)",
-                "Beta",
-                "Expected Return (%)",
-                "Scenario Return (%)",
-            ]
-        ],
+        fmt_df[[
+            "Ticker/Asset",
+            "Asset Type (Remark)",
+            "Current Value",
+            "Weight (%)",
+            "Beta",
+            "Expected Return (%)",
+            "Scenario Return (%)",
+        ]],
         use_container_width=True,
         hide_index=True,
     )
 
 with main_col2:
-    st.subheader("🍩 Asset Allocation (Type)")
-    fig_type = px.pie(
-        edited_df,
-        values="Current Value",
-        names="Asset Type (Remark)",
-        hole=0.4,
-        color_discrete_sequence=px.colors.qualitative.Bold,
-    )
-    fig_type.update_traces(textposition="inside", textinfo="percent+label")
-    fig_type.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
-    st.plotly_chart(fig_type, use_container_width=True)
-
-with main_col3:
     st.subheader("🍕 Asset Allocation (Ticker)")
     fig_ticker = px.pie(
         edited_df,
@@ -442,7 +320,6 @@ with main_col3:
         hole=0.4,
         color_discrete_sequence=px.colors.qualitative.Pastel,
     )
-    # 優化：強制將 Ticker 圓餅圖的標籤移到外側（outside），徹底防止個股文字重疊擠壓
     fig_ticker.update_traces(textposition="outside", textinfo="percent+label")
     fig_ticker.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(fig_ticker, use_container_width=True)
@@ -452,20 +329,13 @@ with main_col3:
 # --------------------------------------------------------
 st.subheader("📈 Cross-Regime Macro Stress Test Matrix")
 
-matrix_data = [
-    {
-        "Scenario/Regime": "Current Baseline Projections",
-        "Portfolio Stressed Return": portfolio_return_baseline,
-    }
-]
+matrix_data = [{"Scenario/Regime": "Current Baseline Projections", "Portfolio Stressed Return": portfolio_return_baseline}]
 for name in CRISIS_PERIODS.keys():
     temp_ret = 0
     for idx, row in edited_df.iterrows():
         tk = row["Ticker/Asset"]
         temp_ret += (row["Weight (%)"] / 100) * stress_matrix[name].get(tk, 0)
-    matrix_data.append(
-        {"Scenario/Regime": name, "Portfolio Stressed Return": temp_ret}
-    )
+    matrix_data.append({"Scenario/Regime": name, "Portfolio Stressed Return": temp_ret})
 
 matrix_df = pd.DataFrame(matrix_data)
 
