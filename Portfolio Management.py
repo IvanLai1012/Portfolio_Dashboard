@@ -33,9 +33,9 @@ return_model = st.sidebar.radio(
 if "rf_rate" not in st.session_state: # 當前無風險利率基準 (%)
     try:
         ten_year_bond = yf.Ticker("^TNX")
-        st.session_state.rf_rate = ten_year_bond.history(period="1d")['Close'].iloc[-1]
+        rf = ten_year_bond.history(period="1d")['Close'].iloc[-1]
     except:
-        st.session_state.rf_rate = 4.0
+        rf = 4.0
 market_premium = 5.5  # 市場風險溢酬 (%)
 
 # 更新預設資料，清晰拆分 Cash 與 MMF，並加入 WS2 與預留的 WS3
