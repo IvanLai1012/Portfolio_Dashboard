@@ -33,9 +33,9 @@ return_model = st.sidebar.radio(
 if "rf_rate" not in st.session_state: # 當前無風險利率基準 (%)
     try:
         ten_year_bond = yf.Ticker("^TNX")
-        rf = ten_year_bond.history(period="1d")['Close'].iloc[-1]
+        st.session_state.rf_rate = ten_year_bond.history(period="1d")['Close'].iloc[-1]
     except:
-        rf = 4.0
+        st.session_state.rf_rate = 4.0
 market_premium = 5.5  # 市場風險溢酬 (%)
 
 # 更新預設資料，清晰拆分 Cash 與 MMF，並加入 WS2 與預留的 WS3
@@ -175,10 +175,10 @@ def fetch_portfolio_analytics(ticker_rows, rf_rate):
 
     return analytics, stress_results
 
-# 執行運算
+# 執行運算 (已修正：將原本的 rf 改為 st.session_state.rf_rate)
 ticker_input_tuples = edited_df[["Ticker/Asset", "Asset Type (Remark)"]].to_dict(orient="records")
 with st.spinner("Calculating live analytics & mapping accounting remarks..."):
-    live_analytics, stress_matrix = fetch_portfolio_analytics(ticker_input_tuples, rf)
+    live_analytics, stress_matrix = fetch_portfolio_analytics(ticker_input_tuples, st.session_state.rf_rate)
 
 # 反寫資料庫
 calculated_returns = []
@@ -193,7 +193,8 @@ for idx, row in edited_df.iterrows():
         if row["Asset Type (Remark)"] == "Pure Cash":
             calculated_returns.append(0.00) # 現金不適用風險溢酬公式
         else:
-            calculated_returns.append(rf + ana["beta"] * market_premium)
+            # 已修正：將原本的 rf 改為 st.session_state.rf_rate
+            calculated_returns.append(st.session_state.rf_rate + ana["beta"] * market_premium)
     else:
         calculated_returns.append(ana["geo_return"])
 
@@ -206,12 +207,12 @@ portfolio_beta = ((edited_df["Weight (%)"] / 100) * edited_df["Beta"]).sum()
 
 
 # --------------------------------------------------------
-# 4. INTERACTIVE SCENARIO SELECTOR (移出 Sidebar，移到主頁面最上方以徹底修復滾動 Bug)
+# 4. INTERACTIVE SCENARIO SELECTOR (主頁面最上方以徹底修復滾動 Bug)
 # --------------------------------------------------------
 st.subheader("🎯 Macro Economic Scenario Selection")
 scenario_list = ["Current Baseline Projections"] + list(CRISIS_PERIODS.keys())
 
-# 在主頁面頂部平鋪展開，下拉選單現在有無限的向下延伸空間，絕對好滑！
+# 下拉選單現在有無限的向下延伸空間
 selected_scen = st.selectbox("Select Active Macro Scenario Focus", scenario_list)
 
 if selected_scen == "Current Baseline Projections":
@@ -224,7 +225,7 @@ else:
 
 
 # --------------------------------------------------------
-# 5. DASHBOARD CARDS DISPLAY
+# 5. DASHBOARD CARDS DISPLAY & DUAL PIE CHARTS
 # --------------------------------------------------------
 st.markdown(" ")
 c1, c2, c3, c4 = st.columns(4)
@@ -240,7 +241,8 @@ else:
 
 st.markdown("---")
 
-main_col1, main_col2 = st.columns([3, 2])
+# 版面配置調整：4 欄給數據表格，各 3 欄給兩個圓餅圖，達到視覺平衡
+main_col1, main_col2, main_col3 = st.columns([4, 3, 3])
 
 with main_col1:
     st.subheader("📋 Dynamically Modeled Asset Allocation")
@@ -254,11 +256,19 @@ with main_col1:
     st.dataframe(fmt_df[["Ticker/Asset", "Asset Type (Remark)", "Current Value", "Weight (%)", "Beta", "Expected Return (%)", "Scenario Return (%)"]], use_container_width=True)
 
 with main_col2:
-    st.subheader("🍩 Asset Distribution")
-    fig = px.pie(edited_df, values="Current Value", names="Asset Type (Remark)", hole=0.4, color_discrete_sequence=px.colors.qualitative.Bold)
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader("🍩 Asset Allocation (Type)")
+    fig_type = px.pie(edited_df, values="Current Value", names="Asset Type (Remark)", hole=0.4, color_discrete_sequence=px.colors.qualitative.Bold)
+    fig_type.update_traces(textposition='inside', textinfo='percent+label')
+    fig_type.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+    st.plotly_chart(fig_type, use_container_width=True)
+
+with main_col3:
+    st.subheader("🍕 Asset Allocation (Ticker)")
+    # 新增：依個股/資產代號（Ticker/Asset）劃分的圓餅圖
+    fig_ticker = px.pie(edited_df, values="Current Value", names="Ticker/Asset", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig_ticker.update_traces(textposition='inside', textinfo='percent+label')
+    fig_ticker.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+    st.plotly_chart(fig_ticker, use_container_width=True)
 
 
 # --------------------------------------------------------
@@ -285,5 +295,3 @@ fig_bar = px.bar(
 fig_bar.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
 fig_bar.update_layout(xaxis_ticksuffix="%", coloraxis_showscale=False, yaxis={'categoryorder':'total descending'}, height=350)
 st.plotly_chart(fig_bar, use_container_width=True)
-
-# python -m streamlit run "C:\Users\Ivan\Documents\Ivan (Daily Life)\investment Analysis and Modeling\Portfolio Management.py"
