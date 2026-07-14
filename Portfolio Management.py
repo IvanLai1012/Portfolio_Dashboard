@@ -1,10 +1,3 @@
-To achieve this, the best and most user-friendly approach in Streamlit is to remove the global radio button and add a new **"Methodology" dropdown column directly into your Data Editor table**.
-
-This gives you granular control, allowing you to select a specific expected return methodology for every single asset (or asset type) dynamically.
-
-Here is the fully updated code. I have replaced the global radio button, added the new column to the `data_editor`, and updated the calculation loop to pull the methodology row by row.
-
-```python
 from datetime import datetime
 import numpy as np
 import pandas as pd
