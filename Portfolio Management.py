@@ -1,3 +1,10 @@
+To achieve this, the best and most user-friendly approach in Streamlit is to remove the global radio button and add a new **"Methodology" dropdown column directly into your Data Editor table**.
+
+This gives you granular control, allowing you to select a specific expected return methodology for every single asset (or asset type) dynamically.
+
+Here is the fully updated code. I have replaced the global radio button, added the new column to the `data_editor`, and updated the calculation loop to pull the methodology row by row.
+
+```python
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -29,25 +36,15 @@ CRISIS_PERIODS = {
 # --------------------------------------------------------
 st.sidebar.header("🛠️ Portfolio Asset Setup")
 
-return_model = st.sidebar.radio(
-    "Select Expected Return Methodology",
-    [
-        "Capital Asset Pricing Model (CAPM)",
-        "Historical Geometric Mean (5Y)",
-        "Smart Realistic Estimate (CAPM + Blended Alpha) 🌟",
-    ],
+# Kept globally as it acts as a parameter for any asset using the 'Smart Realistic Estimate'
+alpha_lambda = st.sidebar.slider(
+    "Alpha Decay Factor (λ) [Used for Smart Estimate]",
+    min_value=0.0,
+    max_value=1.0,
+    value=0.3,
+    step=0.05,
+    help="0.3 代表保留 30% 的歷史超額報酬 (Alpha)，將 70% 進行均值回歸。數值越低越理性保守。",
 )
-
-alpha_lambda = 0.3
-if "Smart Realistic Estimate" in return_model:
-    alpha_lambda = st.sidebar.slider(
-        "Alpha Decay Factor (λ)",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.3,
-        step=0.05,
-        help="0.3 代表保留 30% 的歷史超額報酬 (Alpha)，將 70% 進行均值回歸。數值越低越理性保守。",
-    )
 
 if "rf_rate" not in st.session_state: 
     try:
@@ -71,6 +68,15 @@ default_assets = pd.DataFrame(
             "Equity (Satellite)", "Alternative (Gold)", "HSBC World Selection 2", 
             "Money Market Fund (MMF)", "Pure Cash",
         ],
+        "Methodology": [
+            "Capital Asset Pricing Model (CAPM)", "Capital Asset Pricing Model (CAPM)",
+            "Capital Asset Pricing Model (CAPM)", "Capital Asset Pricing Model (CAPM)",
+            "Capital Asset Pricing Model (CAPM)", "Capital Asset Pricing Model (CAPM)",
+            "Capital Asset Pricing Model (CAPM)", "Capital Asset Pricing Model (CAPM)",
+            "Capital Asset Pricing Model (CAPM)", "Capital Asset Pricing Model (CAPM)",
+            "Capital Asset Pricing Model (CAPM)", "Historical Geometric Mean (5Y)",
+            "Historical Geometric Mean (5Y)",
+        ],
         "Current Value": [
             15.0, 15.0, 5.0, 5.0, 5.0, 5.0, 5.0, 3.0, 7.0, 10.0, 5.0, 10.0, 10.0,
         ],
@@ -93,6 +99,14 @@ edited_df = st.sidebar.data_editor(
                 "HSBC World Selection 3",
                 "Money Market Fund (MMF)",
                 "Pure Cash",
+            ],
+            required=True,
+        ),
+        "Methodology": st.column_config.SelectboxColumn(
+            options=[
+                "Capital Asset Pricing Model (CAPM)",
+                "Historical Geometric Mean (5Y)",
+                "Smart Realistic Estimate (CAPM + Blended Alpha) 🌟",
             ],
             required=True,
         ),
@@ -229,12 +243,16 @@ for idx, row in edited_df.iterrows():
         capm_ret = st.session_state.rf_rate + ana["beta"] * market_premium
 
     geo_ret = ana["geo_return"]
+    
+    # Retrieve the model assigned specifically to this asset row
+    row_model = row.get("Methodology", "Capital Asset Pricing Model (CAPM)")
 
-    if return_model == "Capital Asset Pricing Model (CAPM)":
+    if row_model == "Capital Asset Pricing Model (CAPM)":
         expected_ret = capm_ret
-    elif return_model == "Historical Geometric Mean (5Y)":
+    elif row_model == "Historical Geometric Mean (5Y)":
         expected_ret = geo_ret
     else:
+        # Smart Realistic Estimate (CAPM + Blended Alpha)
         if row["Asset Type (Remark)"] in ["Pure Cash", "Money Market Fund (MMF)"]:
             expected_ret = geo_ret
         else:
@@ -301,6 +319,7 @@ with main_col1:
         fmt_df[[
             "Ticker/Asset",
             "Asset Type (Remark)",
+            "Methodology",
             "Current Value",
             "Weight (%)",
             "Beta",
