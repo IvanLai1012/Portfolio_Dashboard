@@ -40,19 +40,19 @@ DEFAULT_ASSETS = pd.DataFrame(
     {
         "Ticker/Asset": [
             "QQQ", "SCHD", "GOOGL", "SAP", "KO", "MCD", "MSFT",
-            "VEEV", "NVDA", "IAU", "WS2", "MMF", "HKD_CASH",
+            "VEEV", "NVDA", "IAU", "TLT", "WS2", "MMF", "HKD_CASH",
         ],
         "Asset Type (Remark)": [
             "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)",
             "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)",
-            "Equity (Satellite)", "Alternative (Gold)", "HSBC World Selection 2",
-            "Money Market Fund (MMF)", "Pure Cash",
+            "Equity (Satellite)", "Alternative (Gold)", "Bond (US Treasury Bond)",
+            "HSBC World Selection 2", "Money Market Fund (MMF)", "Pure Cash",
         ],
         "Methodology": [
             CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM,
-            HISTORICAL, HISTORICAL, HISTORICAL, HISTORICAL,
+            HISTORICAL, HISTORICAL, HISTORICAL, HISTORICAL, HISTORICAL,
         ],
-        "Current Value": [15.0, 15.0, 5.0, 5.0, 5.0, 5.0, 5.0, 3.0, 7.0, 10.0, 5.0, 10.0, 10.0],
+        "Current Value": [15.0, 15.0, 5.0, 5.0, 5.0, 5.0, 5.0, 3.0, 7.0, 10.0, 10.0, 5.0, 10.0, 10.0],
     }
 )
 
@@ -498,6 +498,7 @@ edited = st.sidebar.data_editor(
                 "Equity (Core)",
                 "Equity (Satellite)",
                 "Alternative (Gold)",
+                "Bond (US Treasury Bond)",
                 "HSBC World Selection 2",
                 "HSBC World Selection 3",
                 "Money Market Fund (MMF)",
