@@ -21,6 +21,7 @@ CRISIS_PERIODS = {
 CAPM = "Capital Asset Pricing Model (CAPM)"
 HISTORICAL = "Historical Geometric Mean (5Y)"
 BLENDED = "Smart Estimate (CAPM + Mean-Reverting Alpha)"
+YIELD_GROWTH = "Yield + Growth (Gordon Model)"
 
 CUSTOM_ASSET_RULES = {
     "WS2": {"remark": "HSBC World Selection 2", "beta": 0.35, "expected_return": 5.50},
@@ -36,23 +37,23 @@ BYPASS_REMARKS = {
     "HSBC World Selection 3",
 }
 
+# Restructured to reflect a long-term Core-Satellite approach
 DEFAULT_ASSETS = pd.DataFrame(
     {
         "Ticker/Asset": [
-            "QQQ", "SCHD", "GOOGL", "SAP", "ZTS", "MCD", "MSFT",
-            "VEEV", "NVDA", "IAU", "WS2", "MMF", "HKD_CASH",
+            "VOO", "QQQ", "SCHD", "WS2", "WS3", 
+            "MSFT", "O", "MMF", "HKD_CASH",
         ],
         "Asset Type (Remark)": [
-            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)",
-            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)",
-            "Equity (Satellite)", "Alternative (Gold)", "HSBC World Selection 2",
-            "Money Market Fund (MMF)", "Pure Cash",
+            "Equity (Core)", "Equity (Core)", "Equity (Core)", "HSBC World Selection 2", "HSBC World Selection 3",
+            "Equity (Satellite)", "Equity (Satellite)", "Money Market Fund (MMF)", "Pure Cash",
         ],
         "Methodology": [
-            CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM, CAPM,
-            HISTORICAL, HISTORICAL, HISTORICAL, HISTORICAL,
+            CAPM, CAPM, YIELD_GROWTH, HISTORICAL, HISTORICAL, 
+            BLENDED, YIELD_GROWTH, HISTORICAL, HISTORICAL,
         ],
-        "Current Value": [20.0, 10.0, 15.0, 5.0, 5.0, 5.0, 5.0, 15.0, 7.0, 5.0, 5.0, 5.0, 0.0],
+        "Current Value": [30000.0, 20000.0, 15000.0, 10000.0, 10000.0, 8000.0, 5000.0, 2000.0, 0.0],
+        "Base Yield (%)": [1.3, 0.6, 3.4, 0.0, 0.0, 0.7, 5.2, 0.0, 0.0],
     }
 )
 
@@ -113,17 +114,18 @@ def _safe_beta(asset_returns: pd.Series, market_returns: pd.Series) -> float:
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_tbill_proxy() -> tuple[float, str]:
-    """Use the 13-week US T-bill yield as a configurable risk-free proxy."""
+def fetch_rf_proxy(proxy_ticker: str = "^TNX") -> tuple[float, str]:
+    """Dynamically fetch either the 10-Year Treasury or 13-Week T-Bill."""
     try:
         raw = yf.download(
-            "^IRX", period="10d", auto_adjust=True, progress=False, threads=False
+            proxy_ticker, period="10d", auto_adjust=True, progress=False, threads=False
         )
-        close = _extract_close(raw, ["^IRX"])
-        value = float(close["^IRX"].dropna().iloc[-1])
-        return value, "Live ^IRX 13-week T-bill proxy"
+        close = _extract_close(raw, [proxy_ticker])
+        value = float(close[proxy_ticker].dropna().iloc[-1])
+        label = "Live ^TNX 10-Year Yield proxy" if proxy_ticker == "^TNX" else "Live ^IRX 13-week T-bill proxy"
+        return value, label
     except Exception as exc:
-        return 4.0, f"Fallback 4.0% because ^IRX was unavailable: {exc}"
+        return 4.0, f"Fallback 4.0% because {proxy_ticker} was unavailable: {exc}"
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -176,6 +178,7 @@ def normalise_asset_table(edited: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
     table = table.dropna(subset=["Ticker/Asset"]).reset_index(drop=True)
     table["Ticker/Asset"] = table["Ticker/Asset"].astype(str).str.strip().str.upper()
     table["Current Value"] = pd.to_numeric(table["Current Value"], errors="coerce").fillna(0.0)
+    table["Base Yield (%)"] = pd.to_numeric(table.get("Base Yield (%)", 0.0), errors="coerce").fillna(0.0)
     table = table[table["Current Value"] >= 0].copy()
 
     for index, row in table.iterrows():
@@ -186,7 +189,7 @@ def normalise_asset_table(edited: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
         if row["Asset Type (Remark)"] != rule["remark"]:
             table.at[index, "Asset Type (Remark)"] = rule["remark"]
             messages.append(f"{ticker}: asset type restored to the preset mapping")
-        if row["Methodology"] not in {HISTORICAL, BLENDED, CAPM}:
+        if row["Methodology"] not in {HISTORICAL, BLENDED, CAPM, YIELD_GROWTH}:
             table.at[index, "Methodology"] = HISTORICAL
 
     table["Row ID"] = [f"R{i + 1:02d}" for i in range(len(table))]
@@ -206,7 +209,6 @@ def build_ticker_analytics(
 
     for _, row in asset_table.iterrows():
         ticker = row["Ticker/Asset"]
-        remark = row["Asset Type (Remark)"]
         if ticker in analytics:
             continue
 
@@ -387,6 +389,7 @@ def apply_expected_return_models(
     alpha_retention: float,
     cash_return: float,
     mmf_return: float,
+    dividend_growth_assumption: float = 0.5,
 ) -> pd.DataFrame:
     table = asset_table.copy()
     output_rows: list[dict[str, Any]] = []
@@ -398,6 +401,8 @@ def apply_expected_return_models(
         metrics = analytics[ticker]
         raw_beta = float(metrics["beta"])
         beta_used = float(np.clip(raw_beta, -0.5, 2.5))
+        base_yield = float(row.get("Base Yield (%)", 0.0))
+        
         capm_return = rf_rate + beta_used * market_premium
         historical_return = float(metrics["geo_return"]) if np.isfinite(metrics["geo_return"]) else np.nan
         note = metrics["source"]
@@ -414,6 +419,11 @@ def apply_expected_return_models(
         elif model == CAPM:
             expected_return = capm_return
             model_used = CAPM
+        elif model == YIELD_GROWTH:
+            # Gordon Growth Estimate: Current Yield + (Market Premium * Beta proxy for capital appreciation)
+            expected_return = base_yield + (capm_return * dividend_growth_assumption)
+            model_used = YIELD_GROWTH
+            note = f"Base Yield ({base_yield}%) + Long-Term Capital Growth"
         elif model == HISTORICAL and np.isfinite(historical_return):
             expected_return = historical_return
             model_used = HISTORICAL
@@ -460,7 +470,12 @@ st.caption(
 )
 
 st.sidebar.header("Portfolio Settings")
-live_rf_rate, rf_source = fetch_tbill_proxy()
+
+# Toggle for Risk-Free Rate Proxy
+rf_choice = st.sidebar.selectbox("Risk-Free Rate Proxy", ["10-Year Treasury (^TNX)", "13-Week T-Bill (^IRX)"])
+target_ticker = "^TNX" if "10-Year" in rf_choice else "^IRX"
+
+live_rf_rate, rf_source = fetch_rf_proxy(target_ticker)
 rf_rate = st.sidebar.number_input(
     "Risk-free rate proxy (%)",
     min_value=-2.0,
@@ -493,6 +508,7 @@ edited = st.sidebar.data_editor(
     column_config={
         "Ticker/Asset": st.column_config.TextColumn(required=True),
         "Current Value": st.column_config.NumberColumn(min_value=0.0, format="%.2f"),
+        "Base Yield (%)": st.column_config.NumberColumn(min_value=0.0, format="%.2f", help="Input current dividend or distribution yield for Yield Growth models"),
         "Asset Type (Remark)": st.column_config.SelectboxColumn(
             options=[
                 "Equity (Core)",
@@ -506,7 +522,7 @@ edited = st.sidebar.data_editor(
             required=True,
         ),
         "Methodology": st.column_config.SelectboxColumn(
-            options=[CAPM, HISTORICAL, BLENDED], required=True
+            options=[CAPM, HISTORICAL, BLENDED, YIELD_GROWTH], required=True
         ),
     },
 )
@@ -584,11 +600,9 @@ with left:
         "Current Value",
         "Weight (%)",
         "Beta (Raw)",
+        "Base Yield (%)",
         "Expected Return (%)",
-        "Historical Volatility (%)",
-        "Historical Max Drawdown (%)",
         "Model Used",
-        "Data / Assumption Source",
     ]
     st.dataframe(
         model_table[display_columns],
@@ -598,21 +612,22 @@ with left:
             "Current Value": st.column_config.NumberColumn(format="%.2f"),
             "Weight (%)": st.column_config.NumberColumn(format="%.2f%%"),
             "Beta (Raw)": st.column_config.NumberColumn(format="%.2f"),
+            "Base Yield (%)": st.column_config.NumberColumn(format="%.2f%%"),
             "Expected Return (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Historical Volatility (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Historical Max Drawdown (%)": st.column_config.NumberColumn(format="%.2f%%"),
         },
     )
 
 with right:
-    st.subheader("Allocation")
-    allocation_figure = px.pie(
+    st.subheader("Structural Allocation")
+    
+    # Sunburst chart groups by Asset Type -> Ticker for Core/Satellite clarity
+    allocation_figure = px.sunburst(
         model_table,
+        path=["Asset Type (Remark)", "Ticker/Asset"],
         values="Current Value",
-        names="Ticker/Asset",
-        hole=0.42,
+        color="Asset Type (Remark)",
     )
-    allocation_figure.update_traces(textposition="inside", textinfo="percent+label")
+    allocation_figure.update_traces(textinfo="label+percent parent")
     allocation_figure.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(allocation_figure, use_container_width=True)
 
@@ -713,3 +728,4 @@ st.download_button(
 st.info(
     "Model limitations: CAPM is a single-factor estimate; historical returns may not repeat; beta proxies understate some idiosyncratic and regime risks; taxes, fees, FX, and liquidity are not modelled."
 )
+
