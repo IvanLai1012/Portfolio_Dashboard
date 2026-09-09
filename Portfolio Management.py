@@ -46,7 +46,7 @@ DEFAULT_ASSETS = pd.DataFrame(
             "SAP", "IAU", "MMF"
         ],
         "Asset Type (Remark)": [
-            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)", 
+            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", 
             "Equity (Satellite)", "Equity (Satellite)", "Equity (Satellite)", 
             "Equity (Satellite)", "Equity (Satellite)", "Money Market Fund (MMF)"
         ],
