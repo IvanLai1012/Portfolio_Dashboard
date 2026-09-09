@@ -41,18 +41,20 @@ BYPASS_REMARKS = {
 DEFAULT_ASSETS = pd.DataFrame(
     {
         "Ticker/Asset": [
-            "VOO", "QQQ", "SCHD", "WS2", "WS3", 
-            "MSFT", "O", "MMF", "HKD_CASH",
+            "QQQ", "SCHD", "GOOGL", 
+            "MSFT", "NVDA", "ZTS", 
+            "SAP", "IAU", "MMF"
         ],
         "Asset Type (Remark)": [
-            "Equity (Core)", "Equity (Core)", "Equity (Core)", "HSBC World Selection 2", "HSBC World Selection 3",
-            "Equity (Satellite)", "Equity (Satellite)", "Money Market Fund (MMF)", "Pure Cash",
+            "Equity (Core)", "Equity (Core)", "Equity (Satellite)", "Equity (Satellite)", 
+            "Equity (Satellite)", "Equity (Satellite)", "Equity (Satellite)", 
+            "Equity (Satellite)", "Equity (Satellite)", "Money Market Fund (MMF)"
         ],
         "Methodology": [
             CAPM, CAPM, YIELD_GROWTH, HISTORICAL, HISTORICAL, 
             BLENDED, YIELD_GROWTH, HISTORICAL, HISTORICAL,
         ],
-        "Current Value": [30000.0, 20000.0, 15000.0, 10000.0, 10000.0, 8000.0, 5000.0, 2000.0, 0.0],
+        "Current Value": [0.3, 0.15, 0.12, 0.1, 0.1, 0.03, 0.05, 0.05, 0.1],
         "Base Yield (%)": [1.3, 0.6, 3.4, 0.0, 0.0, 0.7, 5.2, 0.0, 0.0],
     }
 )
